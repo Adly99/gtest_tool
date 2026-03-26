@@ -43,6 +43,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const modulePrefix          = document.getElementById('modulePrefix');
     const customInstructions    = document.getElementById('customInstructions');
 
+    // Make switching provider instantly update backend and logs
+    if (aiProviderSelector) {
+        aiProviderSelector.addEventListener('change', async (e) => {
+            try {
+                await fetch('/api/provider/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: e.target.value })
+                });
+            } catch (err) {
+                console.error('Failed to switch provider:', err);
+            }
+        });
+    }
+
     const testToRunPath         = document.getElementById('testToRunPath');
     const workingDirPath        = document.getElementById('workingDirPath');
     const runTestsBtn           = document.getElementById('runTestsBtn');

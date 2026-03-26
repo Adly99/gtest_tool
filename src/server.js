@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { logger } from './services/logger.js';
-import { AIService } from './services/aiService.js';
+import { aiService } from './services/aiService.js';
 import { MockGenerator } from './generators/mockGenerator.js';
 import { FunctionInventoryExtractor } from './parsers/functionInventoryExtractor.js';
 import { WholeFileAnalyzer } from './analyzers/wholeFileAnalyzer.js';
@@ -19,7 +19,6 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const aiService = new AIService();
 const mockGenerator = new MockGenerator();
 
 const app = express();
@@ -58,6 +57,20 @@ app.get('/api/diag/models', async (req, res) => {
         res.json(data);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/provider/switch
+ * Hot-swaps the AI Provider.
+ */
+app.post('/api/provider/switch', (req, res) => {
+    const { provider } = req.body;
+    if (provider) {
+        aiService.setProvider(provider);
+        res.json({ success: true, provider: aiService.providerType });
+    } else {
+        res.status(400).json({ error: 'Missing provider' });
     }
 });
 
