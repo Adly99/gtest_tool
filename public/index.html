@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTest Architect — v8.1.0</title>
+<style>
+.debug-drawer {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 400px;
+    background: rgba(10, 10, 15, 0.95);
+    backdrop-filter: blur(40px);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 11000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -20px 0 50px rgba(0,0,0,0.6);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.debug-drawer.hidden { transform: translateX(100%); }
+.debug-header {
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+}
+.debug-output {
+    flex: 1;
+    padding: 20px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    color: #94a3b8;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    background: transparent;
+}
+.fab-btn {
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+    z-index: 10999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fab-btn:hover { transform: scale(1.1) rotate(15deg); box-shadow: 0 15px 40px rgba(99, 102, 241, 0.6); }
+</style>
+    <!-- Modern fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">💠</div>
+            <div class="logo-text">
+                <h1>GTest<span>Architect</span></h1>
+                    <span class="v-tag">v8.1.0</span>
+            </div>
+        </div>
+        <nav class="side-nav">
+            <button class="nav-item active" onclick="switchMainTab('projectTab')">
+                <span class="icon">📁</span> Project
+            </button>
+            <button class="nav-item" onclick="switchMainTab('generateTab')">
+                <span class="icon">✨</span> Generate
+            </button>
+            <button class="nav-item" onclick="switchMainTab('mockTab')">
+                <span class="icon">🏗️</span> Mock Architect
+            </button>
+            <button class="nav-item" onclick="switchMainTab('runnerTab')">
+                <span class="icon">▶</span> Test Runner
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-pill">
+                <div class="avatar">AJ</div>
+                <div class="user-info">
+                    <span class="name">Alice J.</span>
+                    <span class="status">● Active</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="content-area">
+        <header class="top-bar">
+            <div class="search-bar">
+                <span class="icon">🔍</span>
+                <input type="text" id="fileSearch" placeholder="Search files (e.g. main.cpp, utils/)...">
+            </div>
+            <div class="actions">
+                <button id="themeToggle" class="icon-btn">🌙</button>
+                <button id="refreshBtn" class="primary-btn tiny">Refresh</button>
+            </div>
+        </header>
+
+        <!-- Project Tab (Formerly dashboard-root) -->
+        <section id="projectTab" class="tab-content active">
+            <div class="module-header">
+                <h2>Project Configuration</h2>
+                <button id="dirRefreshBtn" class="primary-btn pulse">Refresh Directory</button>
+            </div>
+
+            <div class="v5-form-card">
+              <div class="config-grid">
+                <div class="input-group">
+                    <label>Project Directory</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="projectRootPath" placeholder=". for current">
+                        <button class="ctrl-btn tiny" onclick="openDirPicker('projectRootPath')">📂 Browse</button>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label>compile_commands.json Path</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="compileCmdsPath" placeholder="Optional path...">
+                        <button class="ctrl-btn tiny" onclick="openFilePicker('compileCmdsPath')">📄 Browse</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Custom Stubs Path</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="stubsPath" placeholder="Optional path...">
+                        <button class="ctrl-btn tiny" onclick="openDirPicker('stubsPath')">📂 Browse</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>AI ENGINE</label>
+                    <select id="aiProvider">
+                        <option value="gemini-3-flash-preview" selected>🌌 Gemini 3 Flash (Exp)</option>
+                        <option value="openai">🤖 OpenAI GPT-4o</option>
+                    </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="v5-form-card">
+              <div class="module-header">
+                  <h3>Project Explorer</h3>
+                  <div class="search-bar" style="width: 300px;">
+                      <span class="icon">🔍</span>
+                      <input type="text" id="moduleFileSearch" placeholder="Filter files...">
+                  </div>
+              </div>
+              
+              <div id="fileList" class="file-list">
+                  <!-- Populated by JS -->
+                  <div class="loading-state">Scanning files...</div>
+              </div>
+            </div>
+        </section>
+
+        <!-- Generate Tab -->
+        <section id="generateTab" class="tab-content">
+            <div class="v5-form-card">
+                <!-- ... existing form group content kept consistent ... -->
+                <div class="form-group">
+                    <label>Source File Path (@file)</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="activeSourcePath" placeholder="Select the main source file...">
+                        <button class="ctrl-btn tiny" onclick="openFilePicker('activeSourcePath')">📄 Browse</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Function Name (fun)</label>
+                    <select id="activeFunctionSelect">
+                        <option>Select a source file to see functions</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label>Branch Coverage Strategy</label>
+                        <select id="coverageStrategy">
+                            <option>Cover all branches in the function</option>
+                            <option>Focus on edge cases</option>
+                            <option>Positive paths only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>File Prefix (file)</label>
+                        <input type="text" id="filePrefix" placeholder="e.g., NEW_FILE">
+                    </div>
+                    <div class="form-group">
+                        <label>Module Prefix (modu)</label>
+                        <input type="text" id="modulePrefix" placeholder="e.g., new">
+                    </div>
+                </div>
+
+                <!-- Context Sections -->
+                <div class="context-container">
+                    <div class="context-block">
+                        <div class="block-header">
+                            <label>Header Files</label>
+                            <button class="add-btn" onclick="openFilePickerForContext('headers')">Add Files...</button>
+                        </div>
+                        <div id="headerFilesList" class="file-tag-list">No files added.</div>
+                    </div>
+
+                    <div class="context-block">
+                        <div class="block-header">
+                            <label>Stub Files</label>
+                            <button class="add-btn" onclick="openFilePickerForContext('stubs')">Add Files...</button>
+                        </div>
+                        <div id="stubFilesList" class="file-tag-list">No files added.</div>
+                    </div>
+
+                    <div class="context-block">
+                        <div class="block-header">
+                            <label>Helper Files / Common Functions</label>
+                            <button class="add-btn" onclick="openFilePickerForContext('helpers')">Add Files...</button>
+                        </div>
+                        <div id="helperFilesList" class="file-tag-list">No files added.</div>
+                    </div>
+
+                    <div class="context-block">
+                        <div class="block-header">
+                            <label>Test Case Example</label>
+                            <button class="add-btn" onclick="openFilePickerForContext('examples')">Add File...</button>
+                        </div>
+                        <div id="exampleFilesList" class="file-tag-list">No files added.</div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <label>Custom Instructions</label>
+                    <textarea id="customInstructions" placeholder="e.g., Focus on negative test cases for the 'age' parameter."></textarea>
+                </div>
+
+                <div class="analysis-actions" style="margin-top: 32px; justify-content: center;">
+                    <button id="generateBtn" class="primary-btn shiny big" disabled>Generate Tests</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Test Runner Tab -->
+        <section id="runnerTab" class="tab-content">
+            <div class="v5-form-card">
+                <div class="form-group">
+                    <label>Test File Path</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="testToRunPath" placeholder="Select a test file or generate one...">
+                        <button class="ctrl-btn tiny" onclick="openFilePicker('testToRunPath')">Browse...</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Working Directory</label>
+                    <div class="input-with-browse">
+                        <input type="text" id="workingDirPath" placeholder="Select the directory to execute the test in...">
+                        <button class="ctrl-btn tiny" onclick="openDirPicker('workingDirPath')">Browse...</button>
+                    </div>
+                </div>
+                <div class="execution-console" id="runnerConsole">
+                    <div class="console-placeholder">Ready</div>
+                </div>
+                <div class="analysis-actions" style="margin-top: 24px;">
+                    <button id="runTestsBtn" class="primary-btn shiny">▶ Run Tests</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mock Architect Tab -->
+        <section id="mockTab" class="tab-content">
+            <div class="v5-form-card">
+                <div class="grid-layout">
+                    <div class="config-column">
+                        <div class="form-group">
+                            <label>File Path Input</label>
+                            <div class="input-with-browse">
+                                <span class="icon">📄</span>
+                                <input type="text" id="mockHeaderPath" placeholder="C++ Source File (e.g. service.h)">
+                                <button onclick="openFilePicker('mockHeaderPath')" class="ctrl-btn tiny">Browse</button>
+                            </div>
+                        </div>
+                        
+                        <div class="transformation-options">
+                            <label>TRANSFORMATION STRATEGY</label>
+                            <div class="option-chips">
+                                <label class="chip">
+                                    <input type="checkbox" checked disabled> 
+                                    <span>🛡️ Standard</span>
+                                </label>
+                                <label class="chip">
+                                    <input type="checkbox"> 
+                                    <span>📄 Header Only</span>
+                                </label>
+                                <label class="chip">
+                                    <input type="checkbox" checked> 
+                                    <span>🌌 Namespace</span>
+                                </label>
+                                <label class="chip">
+                                    <input type="checkbox" checked> 
+                                    <span>⚡ Inline</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="action-zone">
+                            <div class="stepper-wrap hidden" id="mockWorkflow">
+                                <div class="step-item active" data-step="1">🔍 <span class="step-label">Scan</span></div>
+                                <div class="step-item" data-step="2">📄 <span class="step-label">Ext</span></div>
+                                <div class="step-item" data-step="3">🏗️ <span class="step-label">Mock</span></div>
+                                <div class="step-item" data-step="4">🛠️ <span class="step-label">Fix</span></div>
+                                <div class="step-item" data-step="5">✅ <span class="step-label">Done</span></div>
+                            </div>
+                            <div class="progress-wrap hidden" id="mockProgressContainer">
+                                <div class="progress-fill" id="mockProgressBar"></div>
+                            </div>
+                            <button id="generateMockBtn" class="primary-btn big-action">
+                                <span class="btn-icon">✨</span> Transform to GMock
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-column">
+                        <div class="transformation-preview">
+                            <div class="preview-pane">
+                                <div class="preview-header">
+                                    <span>SOURCE HEADER</span>
+                                    <span id="sourceHeaderName">Ready</span>
+                                </div>
+                                <div id="sourcePreview" class="preview-content">Select a header to begin...</div>
+                            </div>
+                            <div class="preview-pane">
+                                <div class="preview-header">
+                                    <span>GMOCK OUTPUT</span>
+                                    <div class="preview-actions">
+                                        <button class="ctrl-btn tiny" id="downloadMockBtn">⬇️ Download .h</button>
+                                        <button class="copy-btn tiny" onclick="copyMockOutput()">📋 Copy</button>
+                                    </div>
+                                </div>
+                                <div id="mockPreview" class="preview-content">// Transformed code will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mock Insights Section (v6.1) -->
+                <div id="mockInsights" class="insights-section hidden">
+                    <h3>Architectural Transformation Insights</h3>
+                    <div id="mockInsightsContent" class="insight-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Code Reviewer Modal (v4.0) -->
+    <div id="reviewerModal" class="workflow-overlay hidden">
+        <div class="modal-card">
+            <header>
+                <h2>Code Review <span class="v-badge">v8.1.0</span></h2>
+                <button id="closeModalBtn" class="icon-btn">✕</button>
+            </header>
+            <div id="reviewerCode" class="gen-code scroller"></div>
+            <footer class="fn-controls" style="margin-top: 20px;">
+                <button id="modalDownloadBtn" class="primary-btn tiny">⬇️ Download .cpp</button>
+                <button id="modalCopyBtn" class="ctrl-btn tiny">📋 Copy</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Server-Side File/Directory Picker Modal (v8.1.0) -->
+    <div id="dirPickerModal" class="workflow-overlay hidden">
+        <div class="modal-card">
+
+            <!-- Header row: title + close -->
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 24px 0; flex-shrink:0;">
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <h2 style="font-family:var(--font-header); font-size:1.15rem; font-weight:800;">📂 Select Location</h2>
+                    <span class="picker-mode-badge" id="pickerModeBadge">📁 Select Directory</span>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button onclick="navigateBrowserUp()" class="ctrl-btn tiny" title="Go Up (Backspace)">⤴ Up</button>
+                    <button onclick="closeDirPicker()" class="icon-btn" title="Close (Esc)">✕</button>
+                </div>
+            </div>
+
+            <!-- Breadcrumb path -->
+            <div class="breadcrumb-nav" id="browserBreadcrumbs"></div>
+
+            <!-- Search + shortcuts toolbar -->
+            <div class="browser-toolbar">
+                <div class="search-bar">
+                    <span class="icon">🔍</span>
+                    <input type="search" id="browserSearchInput" placeholder="Filter items..." autocomplete="off">
+                </div>
+                <div class="shortcut-group">
+                    <button class="ctrl-btn tiny" onclick="loadBrowser('HOME')">🏠 Home</button>
+                    <button class="ctrl-btn tiny" onclick="loadBrowser('.')">📁 Project</button>
+                </div>
+            </div>
+
+            <!-- Items grid -->
+            <div id="browserItems" class="browser-grid scroller"></div>
+
+            <!-- Keyboard hints -->
+            <div class="keyboard-hints">
+                <span class="kb-hint"><span class="kb-key">↑↓</span> Navigate</span>
+                <span class="kb-hint"><span class="kb-key">Enter</span> Select / Open</span>
+                <span class="kb-hint"><span class="kb-key">Backspace</span> Go up</span>
+                <span class="kb-hint"><span class="kb-key">Esc</span> Close</span>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <span class="current-path-label" id="currentPathLabel"></span>
+                <button onclick="confirmDirSelection()" class="primary-btn pulse">✔ Use This Directory</button>
+            </div>
+        </div>
+    </div>
+    <!-- Technical Log Sidebar (v7.8.7) -->
+    <div id="debugConsole" class="debug-drawer hidden">
+        <header class="debug-header">
+            <h3>🗄️ Technical Log (v8.0.6)</h3>
+            <div class="debug-actions">
+                <button onclick="listAvailableModels()" class="ctrl-btn tiny" title="List Gemini Models">🔍 Discovery</button>
+                <button onclick="clearDebugLog()" class="icon-btn tiny" title="Clear Log">🗑️</button>
+                <button onclick="refreshDebugLog()" class="icon-btn tiny" title="Refresh Log">🔄</button>
+                <button onclick="toggleDebugConsole()" class="icon-btn tiny">✕</button>
+            </div>
+        </header>
+        <pre id="debugOutput" class="debug-output scroller">Loading logs...</pre>
+    </div>
+
+    <!-- Floating Debug Toggle -->
+    <button id="debugToggleBtn" onclick="toggleDebugConsole()" class="fab-btn" title="Open Technical Log">
+        🖥️
+    </button>
+
+    <script src="app.js"></script>
+</body>
+</html>

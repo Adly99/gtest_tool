@@ -1,0 +1,24 @@
+{
+  "name": "gtest-gen-tool",
+  "version": "1.0.0",
+  "description": "C++ Unit Test Generator using Gemini",
+  "main": "src/cli.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/cli.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@inquirer/prompts": "^8.3.2",
+    "commander": "^11.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "glob": "^10.3.3"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}

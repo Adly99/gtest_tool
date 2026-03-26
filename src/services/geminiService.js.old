@@ -1,0 +1,159 @@
+import { GoogleGenAI } from '@google/genai';
+
+const SYSTEM_PROMPT = `You are a Senior C++ Automated Verification Engineer.
+Your goal is to produce HIGH-QUALITY, COMPILABLE C++ unit tests using GTest and GMock.
+REGULATIONS:
+1. Return ONLY raw, parseable JSON.
+2. NO markdown fences (\`\`\`json), NO commentary outside JSON.
+3. NO trailing commas, NO single quotes in JSON keys/values.
+4. Ensure all C++ code strings are properly escaped (\n, \", etc.).`;
+
+/**
+ * Service to interface with Google Gemini API.
+ */
+export class GeminiService {
+  constructor() {
+    this.apiKey    = process.env.GEMINI_API_KEY;
+    this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    this.maxRetries = 3;
+
+    if (this.apiKey) {
+      this.ai = new GoogleGenAI({ apiKey: this.apiKey });
+    } else {
+      console.warn('[GeminiService] WARNING: GEMINI_API_KEY not set — running in mock mode.');
+    }
+  }
+
+  /**
+   * Queries Gemini and parses the response as JSON.
+   */
+  async queryJSON(promptText) {
+    if (!this.ai) return this._mockResponse(promptText);
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        const raw = await this._callAPI(promptText);
+        return this._parseJSON(raw);
+      } catch (e) {
+        const is429 = e.status === 429 || e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED');
+        if (is429 && attempt < this.maxRetries) {
+          const delay = Math.pow(2, attempt) * 5000;
+          console.warn(`[GeminiService] Rate limit (429) — retrying in ${delay / 1000}s (attempt ${attempt}/${this.maxRetries})…`);
+          await this._sleep(delay);
+        } else {
+          console.error(`[GeminiService] API Error: ${e.message}`);
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Queries Gemini and returns raw text.
+   */
+  async queryText(promptText) {
+    if (!this.ai) return '[MOCK] Raw text response for: ' + promptText.substring(0, 80);
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await this._callAPI(promptText);
+      } catch (e) {
+        const is429 = e.status === 429 || e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED');
+        if (is429 && attempt < this.maxRetries) {
+          const delay = Math.pow(2, attempt) * 5000;
+          await this._sleep(delay);
+        } else {
+          console.error(`[GeminiService] API Error: ${e.message}`);
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ─── private ────────────────────────────────────────────────────────────────
+
+  async _callAPI(promptText) {
+    const response = await this.ai.models.generateContent({
+      model: this.modelName,
+      contents: [
+        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+        { role: 'user', parts: [{ text: promptText }] },
+      ],
+    });
+    return response.text;
+  }
+
+  _parseJSON(raw) {
+    if (!raw) return null;
+    
+    // 1. Primary cleanup: strip markdown and trim
+    let clean = raw.trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
+    try {
+      return JSON.parse(clean);
+    } catch (_) {
+      // 2. heuristic: find the largest balanced { } or [ ] block
+      const firstCurly = clean.indexOf('{');
+      const lastCurly  = clean.lastIndexOf('}');
+      if (firstCurly !== -1 && lastCurly !== -1 && lastCurly > firstCurly) {
+        const candidate = clean.substring(firstCurly, lastCurly + 1);
+        try { return JSON.parse(this._sanitizeJSON(candidate)); } catch (e) {
+             console.error('[GeminiService] JSON heuristic failed (Curly):', e.message);
+        }
+      }
+
+      const firstSquare = clean.indexOf('[');
+      const lastSquare  = clean.lastIndexOf(']');
+      if (firstSquare !== -1 && lastSquare !== -1 && lastSquare > firstSquare) {
+        const candidate = clean.substring(firstSquare, lastSquare + 1);
+        try { return JSON.parse(this._sanitizeJSON(candidate)); } catch (e) {
+             console.error('[GeminiService] JSON heuristic failed (Square):', e.message);
+        }
+      }
+
+      console.error('[GeminiService] All JSON parse attempts failed.');
+      return null;
+    }
+  }
+
+  _sanitizeJSON(jsonStr) {
+    return jsonStr
+      .replace(/,\s*([}\]])/g, '$1') // remove trailing commas
+      .replace(/\s*(?:\r\n|\r|\n)\s*/g, ' '); // collapse multiline strings into single-line (if raw)
+  }
+
+
+  _sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  _mockResponse(promptText) {
+    const p = promptText.toLowerCase();
+    if (p.includes('function') || p.includes('inventory') || p.includes('extract')) {
+      return [
+        { function_name: 'MockFunction', signature: 'void MockFunction()', doxygen_found: false, access_level: 'free', class_name: null, branch_count_estimate: 0, priority: 20, doxygen_summary: '' }
+      ];
+    }
+    if (p.includes('test') || p.includes('generate') || p.includes('suite')) {
+      return {
+        thought_process: ['Mock thought process'],
+        test_type: 'TEST_F',
+        suite_name: 'MockSuite',
+        test_name: 'MockTest_PlaceholderGeneration',
+        body: '    // TODO: Implement real assertions\n    EXPECT_TRUE(true);',
+        imports: ['<gtest/gtest.h>'],
+        mocks_required: [],
+        requires_death_test: false,
+      };
+    }
+    if (p.includes('review') || p.includes('defect')) {
+      return { status: 'PASS', feedback: [] };
+    }
+    return [];
+  }
+}
