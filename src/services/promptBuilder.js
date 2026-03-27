@@ -1,3 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /**
  * PromptBuilder v4.0 — Intelligent GTest & Refactoring Suite
  *
@@ -15,23 +22,26 @@ export class PromptBuilder {
    * builds the ultimate prompt for C++ mock generation following Workflow v05.
    */
   buildMockTransformationPrompt(headerContent, filePath) {
+    let workflowDocs = '';
+    try {
+        const workflowPath = path.resolve(__dirname, '../../GTest_Mock_Generation_Workflow.md');
+        workflowDocs = fs.readFileSync(workflowPath, 'utf8');
+    } catch (err) {
+        workflowDocs = `Error reading workflow file: ${err.message}\n(Please ensure GTest_Mock_Generation_Workflow.md exists in the project root)`;
+    }
+
     return `
 # ROLE: EXPERT C++ GTEST/GMOCK ASSISTANT
 # OBJECTIVE: Systematically transform the provided C++ header into a HIGH-QUALITY GMOCK HEADER following Workflow v05.
 
 # WORKFLOW STEPS TO EXECUTE:
-1. PRESERVE original include guards.
-2. INJECT GMOCK/GTEST: Add #include "gmock/gmock.h" and #include "gtest/gtest.h" after the guard.
-3. PRESERVE original namespaces and includes.
-4. SINGLETON MOCK PATTERN (CRITICAL):
-   - For all STATIC methods in a class, create a companion Singleton Mock class (e.g. ClassNameMock).
-   - For FREE functions in a namespace, create a singleton mock class named [HeaderName]Mock inside the namespace.
-   - Delegate original calls to the getInstance() of the mock.
-5. MOCK PUBLIC INSTANCE METHODS: Replace all public methods (except ctors/dtors) with MOCK_METHOD.
-6. DEFAULT ARGUMENTS: Use MOCK_METHOD for the full signature + an overloaded wrapper for default values.
-7. LIFECYCLE: Preserve constructors, destructors, and assignment operators.
-8. STRIP: Remove private/protected sections entirely.
-9. PRESERVE: Keep typedefs, enums, using-decls, and templated methods.
+The following workflow document provides the exact standard constraints, examples, and line-by-line transformations you must follow strictly:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GTEST / GMOCK WORKFLOW MANUAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${workflowDocs}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # HEADER CONTENT:
 \`\`\`cpp
@@ -42,7 +52,27 @@ ${headerContent}
 # OUTPUT FORMAT:
 Return a SINGLE JSON object:
 {
-  "thought_process": "brief overview of class/namespace structure found",
+  "thought_process": {
+    "workflow_steps": [
+      { "step": "Step 2-3", "transformation": "Header & Structural Setup", "details": "✓ Include guards preserved ✓ GMock/GTest headers injected ✓ Original includes retained" },
+      { "step": "Step 4", "transformation": "Static Methods", "details": "No static methods found (N/A) OR Delegated to [MockClass]" },
+      { "step": "Step 5-5a", "transformation": "Public Methods → MOCK_METHOD", "details": "X methods converted to MOCK_METHOD macros" },
+      { "step": "Step 5a", "transformation": "Default Arguments", "details": "X wrappers generated" },
+      { "step": "Step 6", "transformation": "Lifecycle Methods", "details": "Implicit default constructor & destructor preserved" },
+      { "step": "Step 7", "transformation": "Clean Internals", "details": "Private section removed for mock generation" },
+      { "step": "Step 8", "transformation": "Ancillary Members", "details": "Documentation comments preserved; annotations added" },
+      { "step": "Step 9", "transformation": "Output Generation", "details": "Mock file ready" }
+    ],
+    "generated_features": [
+      "X mockable methods with full const-correctness support",
+      "Overloaded wrappers for [...] to handle default arguments",
+      "Clean public interface - private implementation details removed"
+    ],
+    "todos": [
+      "DONE: Scenario mapping",
+      "TODO: Finalizing wrappers"
+    ]
+  },
   "mock_code": "the ENTIRE compilable transformed header code",
   "singleton_mocks_created": ["Name1", "Name2"]
 }
