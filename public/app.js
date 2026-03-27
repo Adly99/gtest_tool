@@ -748,9 +748,131 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mockInsightsContent = document.getElementById('mockInsightsContent');
                 if (mockInsights && data.thought_process) {
                     mockInsights.classList.remove('hidden');
-                    let html = '';
-                    if (data.thought_process) html += `<div class="insight-card"><strong>🧠 Transformation Strategy</strong><p>${escapeHtml(data.thought_process)}</p></div>`;
-                    if (data.singletons?.length > 0) html += `<div class="insight-card"><strong>🦄 Singletons Detected</strong><ul>${data.singletons.map(s => `<li><code>${escapeHtml(s)}</code></li>`).join('')}</ul></div>`;
+                    // v8.1.0: Premium "Architect Flux" Dashboard
+                    let html = `
+                        <div class="insights-section">
+                            <h3 style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; font-family: var(--font-header); letter-spacing: -0.5px;">
+                                <span style="font-size: 1.4rem; filter: drop-shadow(0 0 8px var(--primary-glow));">🔬</span> Architectural Transformation Insights
+                            </h3>
+                            <div class="insight-grid" style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; align-items: start;">
+                                
+                                <!-- Card 1: Agentic Checklist (Strategic View) -->
+                                <div class="insight-card" style="grid-row: span 2; display: flex; flex-direction: column; border-top: 3px solid var(--primary); box-shadow: 0 10px 30px rgba(99, 102, 241, 0.05);">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99,102,241,0.1); display: flex; align-items: center; justify-content: center; color: var(--primary); box-shadow: 0 0 15px var(--primary-glow);">📝</div>
+                                        <strong style="margin: 0; font-family: var(--font-header); font-size: 1.05rem; letter-spacing: 0.2px;">Agentic Workflow</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 12px; flex: 1;">`;
+
+                    if (data.thought_process.todos && Array.isArray(data.thought_process.todos)) {
+                        const total = data.thought_process.todos.length;
+                        const doneCount = data.thought_process.todos.filter(t => t.startsWith('DONE:')).length;
+                        const progress = Math.round((doneCount / total) * 100);
+
+                        html += `
+                            <div style="margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border);">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-dim); margin-bottom: 8px; font-weight: 800; letter-spacing: 1px;">
+                                    <span>SYSTEM PROGRESS</span>
+                                    <span style="color: var(--success);">${progress}%</span>
+                                </div>
+                                <div style="height: 4px; background: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden;">
+                                    <div style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); box-shadow: 0 0 10px var(--primary-glow); transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);"></div>
+                                </div>
+                            </div>
+                        `;
+
+                        data.thought_process.todos.forEach(todo => {
+                            const isDone = todo.startsWith('DONE:');
+                            const label = todo.replace(/^(DONE:|TODO:)\s*/, '');
+                            html += `
+                                <div style="display: flex; align-items: flex-start; gap: 12px; font-size: 0.82rem; color: ${isDone ? 'var(--text-primary)' : 'var(--text-secondary)'}; padding: 8px; border-radius: 8px; transition: all 0.3s; ${isDone ? 'background: rgba(16,185,129,0.03);' : ''}">
+                                    <div style="width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid ${isDone ? 'var(--success)' : 'var(--glass-border)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; background: ${isDone ? 'var(--success)' : 'transparent'}; transition: all 0.4s;">
+                                        ${isDone ? '<span style="color: white; font-size: 0.65rem; font-weight: 900;">✓</span>' : ''}
+                                    </div>
+                                    <span style="${isDone ? 'text-decoration: line-through; opacity: 0.6;' : ''}; font-weight: ${isDone ? '400' : '600'};">${escapeHtml(label)}</span>
+                                </div>`;
+                        });
+                    }
+
+                    html += `
+                                    </div>
+                                </div>
+
+                                <!-- Card 2: Transformation Steps (Detailed View) -->
+                                <div class="insight-card" style="border-top: 3px solid var(--accent); box-shadow: 0 10px 30px rgba(244, 63, 94, 0.05);">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(244,63,94,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: 0 0 15px rgba(244,63,94,0.2);">🧠</div>
+                                        <strong style="margin: 0; font-family: var(--font-header); font-size: 1.05rem; letter-spacing: 0.2px;">Structural Intelligence Summary</strong>
+                                    </div>
+                                    <div style="overflow-x: auto;">
+                                        <table style="width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 0.8rem;">
+                                            <thead>
+                                                <tr style="text-align: left; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.2px; font-size: 0.65rem; font-weight: 800;">
+                                                    <th style="padding: 0 12px; border: none;">Step</th>
+                                                    <th style="padding: 0 12px; border: none;">Transformation</th>
+                                                    <th style="padding: 0 12px; border: none;">Impact / Details</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+
+                    if (data.thought_process.workflow_steps && Array.isArray(data.thought_process.workflow_steps)) {
+                        data.thought_process.workflow_steps.forEach(step => {
+                            html += `
+                                <tr style="background: rgba(255,255,255,0.015); transition: background 0.2s; border-radius: 6px;">
+                                    <td style="padding: 10px 12px; color: var(--accent); font-weight: 800; border-radius: 6px 0 0 6px; font-family: var(--font-mono); font-size: 0.75rem;">${escapeHtml(step.step)}</td>
+                                    <td style="padding: 10px 12px; font-weight: 700; color: var(--text-primary);">${escapeHtml(step.transformation)}</td>
+                                    <td style="padding: 10px 12px; color: var(--text-secondary); border-radius: 0 6px 6px 0; line-height: 1.4;">${escapeHtml(step.details)}</td>
+                                </tr>`;
+                        });
+                    }
+                    
+                    html += `
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Card 3: Context & Features (Merged Data View) -->
+                                <div class="insight-card" style="border-top: 3px solid var(--secondary); box-shadow: 0 10px 30px rgba(34, 211, 238, 0.05); display: flex; gap: 24px;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                                            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(34,211,238,0.1); display: flex; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.9rem;">🦄</div>
+                                            <strong style="margin: 0; font-size: 0.9rem; color: var(--text-primary); font-family: var(--font-header);">Singletons Detected</strong>
+                                        </div>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">`;
+                        
+                        const singletons = data.singleton_mocks_created || [];
+                        if (singletons.length > 0) {
+                            singletons.forEach(s => {
+                                html += `<code style="padding: 3px 8px; border-radius: 6px; background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.15); color: var(--secondary); font-size: 0.72rem; font-family: var(--font-mono);">${escapeHtml(s)}</code>`;
+                            });
+                        } else {
+                            html += `<span style="color: var(--text-dim); font-style: italic; font-size: 0.75rem;">None</span>`;
+                        }
+
+                    html += `
+                                        </div>
+                                    </div>
+                                    <div style="flex: 1.5; padding-left: 20px; border-left: 1px solid var(--glass-border);">
+                                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                                            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(16,185,129,0.1); display: flex; align-items: center; justify-content: center; color: var(--success); font-size: 0.9rem;">✨</div>
+                                            <strong style="margin: 0; font-size: 0.9rem; color: var(--text-primary); font-family: var(--font-header);">Generated Features</strong>
+                                        </div>
+                                        <ul style="padding-left: 16px; color: var(--success); list-style-type: '⚡ '; font-size: 0.78rem; font-weight: 500;">`;
+                        
+                        if (data.thought_process.generated_features && Array.isArray(data.thought_process.generated_features)) {
+                            data.thought_process.generated_features.forEach(f => {
+                                html += `<li style="margin-bottom: 6px;">${escapeHtml(f)}</li>`;
+                            });
+                        }
+
+                    html += `
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
                     mockInsightsContent.innerHTML = html;
                 }
 

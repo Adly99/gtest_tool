@@ -25,6 +25,7 @@ To ensure the best results from this automated workflow, please consider the fol
 * **Clean Header Design:** Ensure your header files have a clear separation between the public interface and private implementation details.  
 * **Standard Syntax:** Adhere to standard C++ class and method declarations.  
 * **One Class Per Header:** While not mandatory, the process is most reliable when a single primary class is defined per header file.
+* **C++ Modern Formatting:** Ensure the generated mock strictly follows modern C++ formatting. Access modifiers (`public:`, `private:`) should not be indented. Implicit generic constructors/destructors must be explicitly written as `= default;` if none were originally declared.
 
 ### **Workflow Steps:**
 
@@ -141,7 +142,7 @@ public:
 ```
 
 *   
-  **Output:** A header where static class methods are made testable via a singleton mock delegate.
+* **Output:** A header where static class methods are made testable via a singleton mock delegate. The companion class should be named `[ClassName]Mock` (e.g., `BankStorageMock`).
 
 **Step 4a: Handling Free Functions in a Namespace (Singleton Mock Pattern)**
 
@@ -221,16 +222,21 @@ constexpr std::uint32_t GetExtrinsicsSerlSize()
 ```
 
 *   
-  **Output:** A header where free functions are made testable via a singleton mock delegate.
+* **Output:** A header where free functions are made testable via a singleton mock delegate. The companion class should be named `[HeaderName]FunctionsMock` (e.g., `BankAccountFunctionsMock`).
 
 **Step 5: Mocking Public Instance Methods**
 
-* **Goal:** To convert all relevant public instance methods of a class into GMock's MOCK\_METHOD macros.  
+* **Goal:** To convert all relevant public instance methods of a class into GMock's `MOCK_METHOD` macros.  
 * **Input:** The output from Step 4\.  
 * **Transformations:**  
   1. **Method Selection:** All public instance (non-static) methods are targeted, **excluding** constructors and destructors.  
-  2. MOCK\_METHOD **Conversion:** Each selected method is replaced with a MOCK\_METHOD macro.  
-* **Output:** A header where the mockable public API has been transformed into GMock macros.
+  2. **MOCK\_METHOD Conversion:** Each selected method is replaced with a `MOCK_METHOD` macro.  
+  3. **Method Modifiers (`const`, `override`, `noexcept`):** It is critical to append all trailing qualifiers from the original signature into the 4th argument of the `MOCK_METHOD` macro.
+     * If the original method is `const`, append `const`.
+     * If the original method is `override`, append `override`.
+     * If the original method is `noexcept`, append `noexcept`.
+     * *Example:* `MOCK_METHOD(void, compute, (), (const, override, noexcept));`
+* **Output:** A header where the mockable public API has been transformed into GMock macros with all original qualifiers perfectly preserved.
 
 **Step 5a: Handling Methods with Default Arguments**
 
@@ -323,12 +329,148 @@ void getCurrentXZZ(camera::Extrinsics &xzz, camera::CamId::P2Id cam_id) const
   * **Other Declarations:** typedef, enum, using, and friend declarations are kept with comments like // Original typedef \- preserved.  
 * **Output:** The fully transformed mock header content.
 
-**Step 9: Final Output Generation**
+**Step 10: Agentic JSON Response Formatting**
 
-* **Goal:** To save the completed mock header(s) to the specified output path.  
-* **Input:** The final, transformed C++ content and the user-defined output path.  
-* **Action:**  
-  1. The transformed C++ content for each header is finalized.  
-  2. Each result is saved to a file with its original name inside the directory specified in **Step 0**.  
-* **Final Output:** One or more complete, self-contained C++ mock header files in the target directory (e.g., ./mocks/PtpHandler.h).
+* **Goal:** To return the finalized mock code alongside a structured trace of the transformations applied.
+* **Transformations:** 
+  1. **JSON Wrapper:** The AI must wrap the final output in a strict JSON format exactly matching the requested PromptBuilder schema.
+  2. **Workflow Trace (`workflow_steps`):** An array of objects `[{ "step": "Step X", "transformation": "...", "details": "..." }]` detailing the precise actions taken.
+  3. **Feature List (`generated_features`):** An array of strings highlighting the key testing capabilities (e.g., "16 instance methods mocked", "Default argument wrappers added").
+  4. **Todos Checklist (`todos`):** An array of strings representing the internal agentic checklist. Each item MUST start with either `DONE: ` or `TODO: ` (e.g., `["DONE: Injected GMock headers", "TODO: Finalizing private section removal"]`).
+* **Final Output:** A valid JSON payload containing the structured `thought_process` (with `workflow_steps`, `generated_features`, and `todos`) and the raw `mock_code`.
 
+**Comprehensive Example #3 (Standard Interface with Default Arguments):**
+This example demonstrates the complete transformation of a standard service class (`Bank.hpp`) into its mock version, specifically highlighting the explicit handling of implicit constructors and default argument wrappers.
+
+* **Input (`Bank.hpp`):**
+```cpp
+#ifndef BANK_HPP
+#define BANK_HPP
+
+#include "BankAccount.hpp"
+#include <map>
+#include <string>
+
+class Bank {
+public:
+    bool createAccount(const std::string& accountNumber, const std::string& ownerName, AccountType accountType = AccountType::Checking, double initialDeposit = 0.0);
+    bool deposit(const std::string& accountNumber, double amount);
+private:
+    std::map<std::string, BankAccount> accounts_;
+};
+#endif
+```
+
+* **Output (`mocks/Bank.hpp`):**
+```cpp
+#ifndef BANK_HPP
+#define BANK_HPP
+// Original include guard - preserved.
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+// GMock and GTest includes added.
+
+#include "BankAccount.hpp" // Original include - preserved.
+#include <map>             // Original include - preserved.
+#include <string>          // Original include - preserved.
+
+// Original class definition - transformed for GMock.
+class Bank {
+public:
+  // Implicit default constructor - preserved.
+  Bank() = default;
+
+  // Implicit default destructor - preserved.
+  ~Bank() = default;
+
+  // Mock for the full method signature with default arguments.
+  MOCK_METHOD(bool, createAccount,
+              (const std::string &accountNumber, const std::string &ownerName,
+               AccountType accountType, double initialDeposit));
+
+  // Overloaded wrapper to handle calls using the default arguments.
+  bool createAccount(const std::string &accountNumber,
+                     const std::string &ownerName, AccountType accountType) {
+    return createAccount(accountNumber, ownerName, accountType, 0.0);
+  }
+
+  // Overloaded wrapper to handle calls using both default arguments.
+  bool createAccount(const std::string &accountNumber,
+                     const std::string &ownerName) {
+    return createAccount(accountNumber, ownerName, AccountType::Checking, 0.0);
+  }
+
+  MOCK_METHOD(bool, deposit, (const std::string &accountNumber, double amount));
+
+  // Private section and all its contents removed for mock generation.
+};
+
+#endif
+```
+
+**Comprehensive Example #4 (Static Classes - Singleton Mock Pattern):**
+This example shows how a utility class with static storage methods is transformed.
+
+* **Input (`BankReport.hpp`):**
+```cpp
+class BankReport {
+public:
+    static std::string buildSummaryReport(const Bank& bank);
+    static bool exportSummaryReport(const Bank& bank, const std::string& filePath);
+};
+```
+
+* **Output (`mocks/BankReport.hpp`):**
+```cpp
+class BankReportMock {
+public:
+    static BankReportMock& getInstance() {
+        static BankReportMock instance;
+        return instance;
+    }
+    MOCK_METHOD(std::string, buildSummaryReport, (const Bank& bank));
+    MOCK_METHOD(bool, exportSummaryReport, (const Bank& bank, const std::string& filePath));
+private:
+    BankReportMock() = default;
+    ~BankReportMock() = default;
+};
+
+class BankReport {
+public:
+    static std::string buildSummaryReport(const Bank& bank) {
+        return BankReportMock::getInstance().buildSummaryReport(bank);
+    }
+    static bool exportSummaryReport(const Bank& bank, const std::string& filePath) {
+        return BankReportMock::getInstance().exportSummaryReport(bank, filePath);
+    }
+};
+```
+
+**Comprehensive Example #5 (Free Functions in Namespace):**
+This example shows how free functions declared in a header are mocked via a companion singleton.
+
+* **Input (`BankAccount.hpp` excerpt):**
+```cpp
+enum class AccountType { Checking, Savings };
+std::string accountTypeToString(AccountType accountType);
+```
+
+* **Output (`mocks/BankAccount.hpp` excerpt):**
+```cpp
+class BankAccountFunctionsMock {
+public:
+    static BankAccountFunctionsMock& getInstance() {
+        static BankAccountFunctionsMock instance;
+        return instance;
+    }
+    MOCK_METHOD(std::string, accountTypeToString, (AccountType accountType));
+private:
+    BankAccountFunctionsMock() = default;
+    ~BankAccountFunctionsMock() = default;
+};
+
+inline std::string accountTypeToString(AccountType accountType) {
+    return BankAccountFunctionsMock::getInstance().accountTypeToString(accountType);
+}
+```
